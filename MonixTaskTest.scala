@@ -220,6 +220,16 @@ class TaskTest extends FunSuite with Matchers {
 
   }
 
+  class TaskOps[A](t:Task[A]){
+    def retryMaxTimeOrPredicated(maxTime: FiniteDuration, predicate: A => Boolean, interval: FiniteDuration): Task[A] = {
+      t.flatMap { a =>
+        if (predicate(a)) Task.now(a)
+        else if (maxTime.length <= 0 ) Task.raiseError(new RuntimeException("Failed after retries"))
+        else retryMaxTimeOrPredicated(maxTime - interval, predicate, interval).delayExecution(interval)
+      }
+    }
+
+  }
 
   test("Task.sequence -- convert a Seq[Task[A]] to Task[Seq[A]], the order is guaranteed, tasks get evaluated sequentially") {
     val t1 = Task {
@@ -438,6 +448,21 @@ class TaskTest extends FunSuite with Matchers {
       case Failure(ex) => println(s"Oops, exception:$ex")
     }
 
+
+  }
+
+  test("Task parMap2"){
+    val fa1 = Task(1)
+    val fa2 = Task(2)
+
+       // Yields Success(3)
+     val x =   Task.parMap2(fa1, fa2) { (a, b) =>
+          a + b
+     }
+    import monix.execution.Scheduler.Implicits.global
+    val y = x.runToFuture
+    Thread.sleep(1000)
+    y.map (_ shouldBe(3))
 
   }
 
